@@ -2,20 +2,21 @@ package br.senai.sc.livros.model.dao;
 
 import br.senai.sc.livros.model.entities.*;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 
 public class LivroDAO {
 
     private static Collection<Livro> listaLivros = new HashSet<>();
-
+    private Connection conn;
 
     static{
-        Pessoa pessoa = new PessoaDAO().selecionarPorEmail("autor@");
 
         listaLivros.add(new Livro(new Autor("123", "Bernadete", "#@!", "123@321", Genero.FEMININO, "123"),
                 "O fogo", Status.AGUARDANDO_REVISAO, 568, 1234));
-        listaLivros.add(new Livro((Autor)pessoa,
-                "A água", Status.AGUARDANDO_EDICAO, 348, 2345));
         listaLivros.add(new Livro(new Autor("123", "Bernadete", "#@!", "autor@", Genero.FEMININO, "123"),
                 "A pedra", Status.APROVADO, 346, 2542));
         listaLivros.add(new Livro(new Autor("123", "Bernadete", "#@!", "123@321", Genero.FEMININO, "123"),
@@ -38,12 +39,33 @@ public class LivroDAO {
     }
 
     public Livro selecionar(int isbn){
-        for(Livro livro : listaLivros){
-            if(livro.getISBN() == isbn){
-                return livro;
+        String sql = "select * from livros where isbn = ?";
+        try (PreparedStatement prtm = conn.prepareStatement(sql)) {
+            prtm.setInt(1, isbn);
+            try (ResultSet resultSet = prtm.executeQuery()) {
+                if (resultSet.next()) {
+                    return extrairObjetoLivro(resultSet);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Erro na execução do comando SQL!");
             }
-        };
-        return null;
+        } catch (Exception e) {
+            throw new RuntimeException("Erro na preparação do comando SQL!");
+        }
+        throw new RuntimeException("Algo deu ruim!");
+
+    }
+
+    public Livro extrairObjetoLivro(ResultSet resultSet) throws SQLException {
+        String cpf = resultSet.getString("AUTOR_cpf");
+        PessoaDAO pessoaDAO = new PessoaDAO();
+        return new Livro(
+                (Autor) pessoaDAO.selecionarPorCPF(cpf),
+                resultSet.getString("titulo"),
+                Status.getStatusCorreto(resultSet.getString("status")),
+                resultSet.getInt("qtdPaginas"),
+                resultSet.getInt("isbn")
+        );
     }
 
     public void atualizar(int isbn, Livro livroAtualizado){
@@ -62,17 +84,28 @@ public class LivroDAO {
     }
 
     public Collection<Livro> getAllLivros(){
-      return Collections.unmodifiableCollection(listaLivros);
     };
 
     public Collection<Livro> selecionarPorAutor(Pessoa pessoa){
-        Collection<Livro> livrosAutor = new ArrayList<>();
-        for(Livro livro : getAllLivros()){
-            if(livro.getAutor().equals(pessoa)){
-                livrosAutor.add(livro);
-            }
+        ArrayList<Livro> livros = new ArrayList();
+        System.out.println(pessoa.getCPF());
+        String sql = "select * from livros";
+        try (PreparedStatement prtm = conn.prepareStatement(sql)) {
+
+            System.out.println(pessoa.getCPF());
+            prtm.setString(1, pessoa.getCPF());
+//            try (ResultSet resultSet = prtm.executeQuery()) {
+//                while (resultSet.next()) {
+//                    livros.add(extrairObjetoLivro(resultSet));
+//                    System.out.println(livros);
+//                }
+//            } catch (Exception e) {
+//                throw new RuntimeException("Erro na execução do comando SQL! selecionarPorAutor");
+//            }
+        } catch (Exception e) {
+            throw new RuntimeException("Erro na preparação do comando SQL! selecionarPorAutor");
         }
-        return livrosAutor;
+        return null;
     }
 
     public Collection<Livro> selecionarPorStatus(Status status){
